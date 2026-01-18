@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from '@vercel/analytics/react'
 
 const STORAGE_KEY = "study-tracker-items-v1";
+
+function App({ Component, pageProps }) {
+  return (
+    <>
+      <Component {...pageProps} />
+      <Analytics />
+    </>
+  );
+}
+
 
 export default function App() {
   const [items, setItems] = useState(() => {
