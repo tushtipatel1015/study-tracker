@@ -6,67 +6,86 @@ const STORAGE_KEY = "study-tracker-items-v1";
 
 
 export default function App() {
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
+
+  const API_BASE = import.meta.env.VITE_API_BASE || "";
+  const API = `${API_BASE}/api/tasks`;
+
+  const [items, setItems] = useState([]);
+
   const [text, setText] = useState("");
   const [filter, setFilter] = useState("all"); // all | active | done
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
 
-  function addItem(e) {
+  useEffect(() => {
+    async function load() {
+      const res = await fetch(API);
+      const data = await res.json();
+      setItems(data);
+    }
+    load();
+  }, []);
+
+  async function addItem(e) {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    setItems((prev) => [
-      { id: crypto.randomUUID(), title: trimmed, done: false },
-      ...prev,
-    ]);
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed, done: false }),
+    });
+
+    const created = await res.json();
+    setItems((prev) => [created, ...prev]);
     setText("");
   }
 
-  function toggleDone(id) {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, done: !it.done } : it))
-    );
+  async function toggleDone(id) {
+    const res = await fetch(`${API}/${id}`, { method: "PATCH" });
+    const updated = await res.json();
+  
+    setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
   }
 
-  function removeItem(id) {
+  async function removeItem(id) {
+    await fetch(`${API}/${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((it) => it.id !== id));
   }
 
-  function editTask(id, newTask) {
+  async function editTask(id, newTask) {
     const trimmed = newTask.trim();
-    
-    if(!trimmed){
-      return;
-    }
-
-    setItems((prev) => prev.map((it) => (it.id === id ? {...it, title: trimmed } : it)));
+    if (!trimmed) return;
+  
+    const res = await fetch(`${API}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed }),
+    });
+  
+    const updated = await res.json();
+    setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
   }
-
-  function moveTask(id, direction) { 
-    // -1 move up
-    // +1 move down
-
-    setItems((prev) => { 
+  async function moveTask(id, direction) {
+    setItems((prev) => {
       const idx = prev.findIndex((t) => t.id === id);
-      
       if (idx === -1) return prev;
-
+  
       const newIdx = idx + direction;
       if (newIdx < 0 || newIdx >= prev.length) return prev;
-
+  
       const copy = [...prev];
-      const temp = copy[idx];
-      copy[idx] = copy[newIdx];
-      copy[newIdx] = temp;
+      [copy[idx], copy[newIdx]] = [copy[newIdx], copy[idx]];
+  
+      // Persist new order (fire-and-forget)
+      fetch(`${API}/reorder`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: copy.map((t) => t.id) }),
+      });
+  
       return copy;
     });
   }
@@ -199,8 +218,8 @@ export default function App() {
           </li>
           ))}
         </ul>
-        <Analytics />
       </div>
+      <Analytics />
     </div>
   );
 }
