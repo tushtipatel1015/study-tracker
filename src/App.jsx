@@ -18,19 +18,36 @@ export default function App() {
   const [editingText, setEditingText] = useState("");
 
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+  
+    async function boot() {
+      setLoading(true);
       try {
-        const res = await fetch(API);
-        const data = await res.json();
-        setItems(data);
-      } catch (e) {
-        console.error("Backend waking up...");
+        await loadTasks();
+      } catch (err) {
+        console.log("Backend likely sleeping, retrying once...", err);
+        // wait 3 seconds then retry
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          await loadTasks();
+        } catch (e2) {
+          console.log("Still waking up. User can retry / add task.", e2);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    load();
+  
+    boot();
+    return () => { cancelled = true; };
   }, []);
+
+  async function loadTasks() {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+    const data = await res.json();
+    setItems(data);
+  }
 
   async function addItem(e) {
     e.preventDefault();
@@ -44,8 +61,8 @@ export default function App() {
     });
 
     const created = await res.json();
-    setItems((prev) => [created, ...prev]);
     setText("");
+    await loadTasks(); // pulls saved tasks (including old ones)
   }
 
   async function toggleDone(id) {
