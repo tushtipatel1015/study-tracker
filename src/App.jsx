@@ -130,7 +130,7 @@ export default function App() {
 
         {loading ? (
           <p style={{ marginTop: 16, opacity: 0.8 }}>
-            Waking up server… (Render free tier can take ~10–30 seconds after inactivity)
+            Waking up server, add a task after minute and reload the page! (Render free tier can take a minute to start-up after inactivity)
           </p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, marginTop: 14 }}>
